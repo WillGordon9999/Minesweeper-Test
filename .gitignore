@@ -76,3 +76,5 @@ DerivedDataCache/*
 Minesweeper/Binaries
 Minesweeper/Intermediate
 Minesweeper/Saved
+Minesweeper/Plugins/MinesweeperGame/Binaries
+Minesweeper/Plugins/MinesweeperGame/Intermediate
