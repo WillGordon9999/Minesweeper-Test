@@ -53,128 +53,202 @@ void FMinesweeperGameModule::ShutdownModule()
 	FGlobalTabmanager::Get()->UnregisterNomadTabSpawner(MinesweeperGameTabName);
 }
 
+void FMinesweeperGameModule::PluginButtonClicked()
+{
+	FGlobalTabmanager::Get()->TryInvokeTab(MinesweeperGameTabName);
+}
+
 void FMinesweeperGameModule::GenerateGrid()
 {
-	uint32 currentMines = 0;
+	uint32 currentMines = 0;	
 	Grid.Get()->ClearChildren();
-	Mines.Empty();
-	Slots.SetNum(Width);
 	GridButtonText.Get()->SetText(FText::FromString(TEXT("Generate New Grid")));
+	bFirstClick = true;
 
-	for (uint32 i = 0; i < Width; i++)
-		Slots[i].SetNum(Height);
+	Mines.Empty();
+	//Slots.SetNum(Width);
+	//for (uint32 i = 0; i < Width; i++)
+	//	Slots[i].SetNum(Height);
 
+	SlotsNew.Empty(Width * Height);
+	MineIndices.Empty(MineCount);
 
 	for (uint32 row = 0; row < Width; row++)
 	{
-		//Slots.EmplaceAt(col, TArray<int32>());
-		
 		for (uint32 col = 0; col < Height; col++)
-		{
-			//bool createMine = false;
+		{			
 			int32 newNum = 0;
 			if (currentMines < MineCount)
 			{
 				if (FMath::RandRange(1, 10) % 2 == 0)
 				{
 					Mines.Add(TTuple<int32, int32>(row, col));
+					MineIndices.Add(GetTileIndex(row, col));
 					newNum = -1;
 					currentMines++;
 				}
 			}
-
-			//Slots[col].EmplaceAt(row, newNum);
-			Slots[row][col] = newNum;
 			
-			TSharedPtr<STextBlock> text;
-			TSharedPtr<SButton> button;
-			FColor pressedColor = FColor(0.3, 0.3, 0.3, 0.8);
+			//Slots[row][col] = newNum;
+			int32 index = SlotsNew.Add(FTileData());
+			SlotsNew[index].Index = index;
+			SlotsNew[index].Row = row;
+			SlotsNew[index].Column = col;
+			SlotsNew[index].Type = newNum;
+
+			TSharedPtr<STextBlock> text;						
 			auto slot = Grid.Get()->AddSlot(col, row);
 			
 			slot
 			.HAlign(HAlign_Fill)
 			.VAlign(VAlign_Fill)
 			[				
-				SAssignNew(button, SButton)
-					//SNew(SButton)
-					.ButtonColorAndOpacity(FColor(0.7, 0.7, 0.7, 0.8))
-					.Text(FText::FromString(TEXT(" ")))					
+				SNew(SButton)
+				.ButtonColorAndOpacity(TileColor)
+				.Text(FText::FromString(TEXT(" ")))	
 				[
 					SAssignNew(text, STextBlock)
 					.Text(FText::FromString(" "))
-					//.Text(FText::FromString(FString::FromInt(row) + " " + FString::FromInt(col)))
-				]								
+				]
 				.OnClicked_Lambda
 				(
-					[this, row, col, text]() -> FReply
+					[this, row, col, text, index]() -> FReply
 					{
-						if (Slots[row][col] >= 0)
-						{							
-							text.Get()->SetText(FText::FromString(FString::FromInt(Slots[row][col])));
-							//button.Get()->SetColorAndOpacity(pressedColor);							
-							//RevealNewTiles(); //Should Search Left Right then Up and down
-						}
-						else
+						if (SlotsNew[index].Type >= 0)
 						{
-							//YOU DIED
-							GridButtonText.Get()->SetText(FText::FromString("You Lose. Play Again?"));
+							text.Get()->SetText(FText::FromString(FString::FromInt(SlotsNew[index].Type)));
+							bFirstClick = false;
+							SlotsNew[index].bIsChecked = true;
+							RevealAdjacentTiles(row, col);
+						}
 
-							for (int32 i = 0; i < Mines.Num(); i++)
+						else
+						{							
+							if (bFirstClick)
 							{
-								//Show Remaining Mines here
+								//Move this mine somewhere else
+								SlotsNew[index].bIsChecked = true;
+								int32 newIndex = index + Width;
+								newIndex = FMath::Clamp(newIndex, 0, (Width * Height) - 1);
+								MineIndices.Remove(index);
+								MineIndices.Add(newIndex);
+								CalculateAdjacentTiles(row, col, -1);
+								TTuple<int32, int32> newMine = GetRowAndColumn(newIndex);
+								CalculateAdjacentTiles(newMine.Key, newMine.Value, 1);
+								bFirstClick = false;
+								RevealAdjacentTiles(row, col);
 							}
+
+							else
+							{
+								GridButtonText.Get()->SetText(FText::FromString("You Lose. Play Again?"));
+
+								for (int32 i = 0; i < MineIndices.Num(); i++)
+								{
+									SlotsNew[MineIndices[i]].Text.Get()->SetText(FText::FromString("X"));
+								}
+							}							
 						}
 
 						return FReply::Handled();
 					}
 				)				
 			];
+
+			SlotsNew[index].Text = text;
 		}
 	}
-
-	TArray<TTuple<int32, int32>> adjacents =
-	{
-		{ -1, -1 },
-		{ -1, 0 },
-		{ -1, 1 },
-		{ 0, -1 },
-		{ 0, 1 },
-		{ 1, -1 },
-		{ 1, 0 },
-		{ 1, 1 }
-	};
 
 	for (int32 i = 0; i < Mines.Num(); i++)
 	{
 		int32 rowCenter = Mines[i].Key;
 		int32 colCenter = Mines[i].Value;
 
-		for (int j = 0; j < 8; j++)
-		{
-			int32 row = rowCenter + adjacents[j].Key;
-			int32 col = colCenter + adjacents[j].Value;
+		CalculateAdjacentTiles(rowCenter, colCenter, 1);
+	}
+}
 
-			if (Slots.IsValidIndex(row) && Slots[row].IsValidIndex(col))
+void FMinesweeperGameModule::CalculateAdjacentTiles(int32 Row, int32 Column, int32 Value)
+{		
+	for (int32 i = 0; i < adjacents.Num(); i++)
+	{
+		int32 adjRow = Row + adjacents[i].Key;
+		int32 adjCol = Column + adjacents[i].Value;
+
+		if (FTileData* Tile = GetTile(adjRow, adjCol))
+		{
+			if (Value >= 0)
 			{
-				if (Slots[row][col] >= 0)
+				if (Tile->Type >= 0)
 				{
-					Slots[row][col]++;
+					Tile->Type += Value;
 				}
 			}
-			//if (row >= 0 && row < Slots.Num())
-			//{
-			//	if (col >= 0 && col < Slots[row].Num())
-			//	{
-			//		
-			//	}
-			//}
+
+			else
+			{
+				if (Tile->Type > 0)
+				{
+					Tile->Type += Value;
+				}
+			}
+		}		
+	}
+}
+
+void FMinesweeperGameModule::RevealAdjacentTiles(int32 Row, int32 Column)
+{
+	int32 multiplier = 1;
+
+	for (int32 i = 0; i < adjacents.Num(); i++)
+	{
+		multiplier = 1;
+
+		while (true)
+		{
+			int32 adjRow = Row + adjacents[i].Key * multiplier;
+			int32 adjCol = Column + adjacents[i].Value * multiplier;
+
+			int32 newIndex = GetTileIndex(adjRow, adjCol);
+
+			if (!SlotsNew.IsValidIndex(newIndex))
+				break;
+
+			if (SlotsNew[newIndex].bIsChecked) //Stop at a tile that has previously been checked
+				break;
+
+			SlotsNew[newIndex].bIsChecked = true;
+
+			if (SlotsNew[newIndex].Type < 0) //Make sure mines don't get marked
+				break;
+			
+			SlotsNew[newIndex].Text.Get()->SetText(FText::FromString(FString::FromInt(SlotsNew[newIndex].Type)));
+
+			if (SlotsNew[newIndex].Type > 0) //Stop at a tile with adjacent mines							
+				break;
+			
+			multiplier++;
 		}
 	}
 }
 
 TSharedRef<SDockTab> FMinesweeperGameModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {	
-	Slots = TArray<TArray<int32>>();
+	//Slots = TArray<TArray<int32>>();
+	SlotsNew = TArray<FTileData>();
+	TileColor = FColor(0.7, 0.7, 0.7, 0.8);
+
+	adjacents =
+	{
+		{ -1, -1 },	//TOP LEFT
+		{ -1, 0 },	//TOP MIDDLE
+		{ -1, 1 },	//TOP RIGHT
+		{ 0, -1 },	//MIDDLE LEFT
+		{ 0, 1 },	//MIDDLE RIGHT
+		{ 1, -1 },	//BOTTOM LEFT
+		{ 1, 0 },	//BOTTOM MIDDLE
+		{ 1, 1 }	//BOTTOM RIGHT
+	};
 
 	auto Tab = SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
@@ -276,7 +350,6 @@ TSharedRef<SDockTab> FMinesweeperGameModule::OnSpawnPluginTab(const FSpawnTabArg
 			.VAlign(VAlign_Center)
 			[
 				SAssignNew(Grid, SGridPanel)				
-				//+SGridPanel::Slot(0, 0)
 			]
 		];
 
@@ -284,10 +357,7 @@ TSharedRef<SDockTab> FMinesweeperGameModule::OnSpawnPluginTab(const FSpawnTabArg
 	return Tab;
 }
 
-void FMinesweeperGameModule::PluginButtonClicked()
-{
-	FGlobalTabmanager::Get()->TryInvokeTab(MinesweeperGameTabName);
-}
+
 
 void FMinesweeperGameModule::RegisterMenus()
 {
