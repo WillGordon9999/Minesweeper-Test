@@ -280,45 +280,19 @@ void FMinesweeperGameModule::GenerateGrid()
 
 							Tiles[index].Button.Get()->SetColorAndOpacity(PressedColor);
 							Tiles[index].Button.Get()->SetBorderBackgroundColor(PressedColor);
-
-							//bFirstClick = false;
+							
 							Tiles[index].bIsChecked = true;
 							RevealTileLoop(row, col);							
 						}
 
 						else
-						{
-							//Save the player from instantly losing if they first click on a mine
-							//if (bFirstClick)
-							//{
-							//	Tiles[index].bIsChecked = true;
-							//	Tiles[index].Button.Get()->SetColorAndOpacity(PressedColor);
-							//	Tiles[index].Button.Get()->SetBorderBackgroundColor(PressedColor);								
-							//
-							//	//Move this mine somewhere else
-							//	int32 newIndex = index + Width;
-							//	newIndex = FMath::Clamp(newIndex, 0, (Width * Height) - 1);
-							//	
-							//	MineIndices.Remove(index);
-							//	CalculateAdjacentTiles(row, col, -1); //Remove 1 from removed position
-							//	MineIndices.Add(newIndex);
-							//
-							//	TTuple<int32, int32> newMine = GetRowAndColumn(newIndex);
-							//	CalculateAdjacentTiles(newMine.Key, newMine.Value, 1);
-							//	bFirstClick = false;
-							//
-							//	RevealTileLoop(row, col);
-							//}
+						{						
+							GridButtonText.Get()->SetText(FText::FromString("You Lose. Play Again?"));
 
-							//else
+							for (int32 i = 0; i < MineIndices.Num(); i++)
 							{
-								GridButtonText.Get()->SetText(FText::FromString("You Lose. Play Again?"));
-
-								for (int32 i = 0; i < MineIndices.Num(); i++)
-								{
-									if (Tiles.IsValidIndex(MineIndices[i]))
-										Tiles[MineIndices[i]].Text.Get()->SetText(FText::FromString("X"));
-								}
+								if (Tiles.IsValidIndex(MineIndices[i]))
+									Tiles[MineIndices[i]].Text.Get()->SetText(FText::FromString("X"));
 							}							
 						}
 
@@ -334,30 +308,7 @@ void FMinesweeperGameModule::GenerateGrid()
 
 	PrevWidth = Width;
 	PrevHeight = Height;
-	PrevMineCount = MineCount;
-
-	//for (int32 i = ShuffleIndices.Num() - 1; i > 0; i--)
-	//{
-	//	int32 rand = FMath::RandRange(0, i);
-	//	ShuffleIndices.SwapMemory(i, rand);
-	//}
-	//
-	//for (uint32 i = 0; i < MineCount; i++)
-	//{
-	//	int32 index = ShuffleIndices[i];
-	//	Tiles[index].Type = -1;
-	//	MineIndices.Add(index);
-	//}
-
-	//for (int32 i = 0; i < MineIndices.Num(); i++)
-	//{
-	//	TTuple<int32, int32> minePos = GetRowAndColumn(MineIndices[i]);
-	//	
-	//	int32 rowCenter = minePos.Key;
-	//	int32 colCenter = minePos.Value;
-	//
-	//	CalculateAdjacentTiles(rowCenter, colCenter, 1);
-	//}
+	PrevMineCount = MineCount;	
 }
 
 TSharedRef<SDockTab> FMinesweeperGameModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
