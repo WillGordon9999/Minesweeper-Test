@@ -54,6 +54,9 @@ private:
 
 	TSharedPtr<class SGridPanel> Grid;
 	TSharedPtr<class STextBlock> GridButtonText;	 	
+	TSharedPtr<class SEditableTextBox> WidthText;	 	
+	TSharedPtr<class SEditableTextBox> HeightText;	 	
+	TSharedPtr<class SEditableTextBox> MineCountText;	 	
 	TSharedPtr<class FUICommandList> PluginCommands;
 
 	TArray<FTileData> Tiles;
